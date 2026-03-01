@@ -2,8 +2,12 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import pydeck as pdk
-# use the OpenAI Python package for both Gemini and ChatGPT
+# use the OpenAI Python package to access Gemini models
+# switch to using the standalone gemini package
+import gemini
+# ChatGPT support via the OpenAI package
 import openai
+from openai import OpenAI  # explicit class for convenience
 
 # ---------------------------------------------------------------------------
 # Agent implementations (replace stubs with real logic as necessary)
@@ -43,8 +47,12 @@ class ItineraryPlannerAgent:
     def __init__(self, api_key: str, model: str):
         # model is either "Gemini" or "ChatGPT"
         self.model = model
-        # use the OpenAI client to access either model by name
-        self.client = OpenAI(api_key=api_key)
+        if model == "Gemini":
+            self.client = gemini.Client(api_key=api_key)
+        else:
+            # configure OpenAI for ChatGPT
+            # use the class imported above or via openai.OpenAI
+            self.client = openai.OpenAI(api_key=api_key)
 
     def create_itinerary(
         self, destination: str, best_month: str, hotel: dict, duration: int
@@ -54,11 +62,9 @@ class ItineraryPlannerAgent:
             f"in the best month: {best_month}. "
             f"Recommended Hotel: {hotel.get('name', 'N/A')}.")
 
-        # select model string based on chosen LLM
         if self.model == "Gemini":
-            model_name = "gemini-1"
             response = self.client.responses.create(
-                model=model_name,
+                model="gemini-1",
                 input=[
                     {"role": "system", "content": "You are an expert travel planner."},
                     {"role": "user", "content": prompt},
@@ -67,7 +73,7 @@ class ItineraryPlannerAgent:
             )
             return response.output_text
         else:
-            # ChatGPT path using the same OpenAI client
+            # ChatGPT path (using OpenAI client)
             response = self.client.chat.completions.create(
                 model="gpt-4",
                 messages=[
@@ -97,7 +103,9 @@ hotel_agent = HotelRecommenderAgent()
 # instantiate the itinerary planner only when we have a key
 # and know which model to use
 itinerary_agent = None
-itinerary_agent = ItineraryPlannerAgent(api_key=api_key, model=model_choice)
+
+if api_key:
+    itinerary_agent = ItineraryPlannerAgent(api_key=api_key, model=model_choice)
 
 # example dataset hooks (replace with actual data loading)
 # weather_agent.train(historical_weather_data)
@@ -113,31 +121,35 @@ preferences = st.text_area(
 duration = st.slider("Trip duration (days):", 1, 14, 5)
 
 if st.button("Generate Travel Plan ✨"):
-    best_months = weather_agent.predict_best_time(
-        {"latitude": 41.9028, "longitude": 12.4964}
-    )
-    best_month = best_months[0]["month"] if best_months else "Unknown"
-    recommended_hotels = hotel_agent.find_hotels(preferences)
+        if itinerary_agent is None:
+            st.error("Please provide an API key before generating a plan.")
+        else:
+            best_months = weather_agent.predict_best_time(
+                {"latitude": 41.9028, "longitude": 12.4964}
+            )
+            best_month = best_months[0]["month"] if best_months else "Unknown"
+            recommended_hotels = hotel_agent.find_hotels(preferences)
 
-    itinerary = itinerary_agent.create_itinerary(
-        destination, best_month, recommended_hotels[0], duration
-    )
+            itinerary = itinerary_agent.create_itinerary(
+                destination, best_month, recommended_hotels[0], duration
+            )
 
-    st.subheader("📆 Best Months to Visit")
-    for m in best_months:
-        st.write(f"Month {m['month']}: Score {m['score']:.2f}")
+            st.subheader("📆 Best Months to Visit")
+            for m in best_months:
+                st.write(f"Month {m['month']}: Score {m['score']:.2f}")
 
-    st.subheader("🏨 Recommended Hotel")
-    if recommended_hotels:
-        h = recommended_hotels[0]
-        st.write(f"**{h['name']}** - {h['description']}")
-    else:
-        st.write("No hotels available.")
+            st.subheader("🏨 Recommended Hotel")
+            if recommended_hotels:
+                h = recommended_hotels[0]
+                st.write(f"**{h['name']}** - {h['description']}")
+            else:
+                st.write("No hotels available.")
 
-    st.subheader("📜 Generated Itinerary")
-    st.write(itinerary)
+            st.subheader("📜 Generated Itinerary")
+            st.write(itinerary)
+            st.subheader("🗺 Destination Map")
+            map_data = pd.DataFrame({"lat": [41.9028], "lon": [12.4964]})
+            st.map(map_data)
 
-    st.subheader("🗺 Destination Map")
-    map_data = pd.DataFrame({"lat": [41.9028], "lon": [12.4964]})
-    st.map(map_data)
+
 
