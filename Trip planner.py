@@ -97,7 +97,7 @@ hotel_agent = HotelRecommenderAgent()
 # instantiate the itinerary planner only when we have a key
 # and know which model to use
 itinerary_agent = None
-    itinerary_agent = ItineraryPlannerAgent(api_key=api_key, model=model_choice)
+itinerary_agent = ItineraryPlannerAgent(api_key=api_key, model=model_choice)
 
 # example dataset hooks (replace with actual data loading)
 # weather_agent.train(historical_weather_data)
