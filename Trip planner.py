@@ -2,10 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import pydeck as pdk
-# use the OpenAI Python package to access Gemini models
-# switch to using the standalone gemini package
-import gemini
-# ChatGPT support via the OpenAI package
+# use the OpenAI Python package for both Gemini and ChatGPT
 import openai
 
 # ---------------------------------------------------------------------------
@@ -46,11 +43,8 @@ class ItineraryPlannerAgent:
     def __init__(self, api_key: str, model: str):
         # model is either "Gemini" or "ChatGPT"
         self.model = model
-        if model == "Gemini":
-            self.client = gemini.Client(api_key=api_key)
-        else:
-            # configure OpenAI for ChatGPT
-            self.client = OpenAI(api_key=api_key)
+        # use the OpenAI client to access either model by name
+        self.client = OpenAI(api_key=api_key)
 
     def create_itinerary(
         self, destination: str, best_month: str, hotel: dict, duration: int
@@ -60,9 +54,11 @@ class ItineraryPlannerAgent:
             f"in the best month: {best_month}. "
             f"Recommended Hotel: {hotel.get('name', 'N/A')}.")
 
+        # select model string based on chosen LLM
         if self.model == "Gemini":
+            model_name = "gemini-1"
             response = self.client.responses.create(
-                model="gemini-1",
+                model=model_name,
                 input=[
                     {"role": "system", "content": "You are an expert travel planner."},
                     {"role": "user", "content": prompt},
@@ -71,7 +67,7 @@ class ItineraryPlannerAgent:
             )
             return response.output_text
         else:
-            # ChatGPT path (using OpenAI client)
+            # ChatGPT path using the same OpenAI client
             response = self.client.chat.completions.create(
                 model="gpt-4",
                 messages=[
@@ -82,25 +78,6 @@ class ItineraryPlannerAgent:
             )
             return response.choices[0].message.content
 
-    def create_itinerary(
-        self, destination: str, best_month: str, hotel: dict, duration: int
-    ) -> str:
-        prompt = (
-            f"Create a {duration}-day travel itinerary for {destination} "
-            f"in the best month: {best_month}. "
-            f"Recommended Hotel: {hotel.get('name', 'N/A')}.")
-
-        response = self.client.responses.create(
-            model="gemini-1",
-            input=[
-                {"role": "system", "content": "You are an expert travel planner."},
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=300,
-        )
-
-        # use convenience property for text output
-        return response.output_text
 
 
 # ---------------------------------------------------------------------------
@@ -119,9 +96,7 @@ weather_agent = WeatherAnalysisAgent()
 hotel_agent = HotelRecommenderAgent()
 # instantiate the itinerary planner only when we have a key
 # and know which model to use
-tinerary_agent = None
-
-if api_key:
+itinerary_agent = None
     itinerary_agent = ItineraryPlannerAgent(api_key=api_key, model=model_choice)
 
 # example dataset hooks (replace with actual data loading)
@@ -165,6 +140,4 @@ if st.button("Generate Travel Plan ✨"):
     st.subheader("🗺 Destination Map")
     map_data = pd.DataFrame({"lat": [41.9028], "lon": [12.4964]})
     st.map(map_data)
-
-
 
